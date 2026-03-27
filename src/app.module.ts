@@ -7,6 +7,7 @@ import { RepairsModule } from './repairs/repairs.module';
 import { AuthModule } from './auth/auth.module';
 import { UsersModule } from './users/users.module';
 import { NotificationsModule } from './notifications/notifications.module';
+import { RepairPartsModule } from './repair-parts/repair-parts.module';
 
 @Module({
   imports: [
@@ -15,7 +16,7 @@ import { NotificationsModule } from './notifications/notifications.module';
     AuthModule,      // موديول التحقق من الدخول
     CustomersModule, // موديول الزبائن
     RepairsModule,   // موديول تذاكر الصيانة
-    NotificationsModule, // موديول الإشعارات
+    NotificationsModule, RepairPartsModule, // موديول الإشعارات
   ],
   controllers: [AppController],
   providers: [AppService],

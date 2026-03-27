@@ -5,7 +5,7 @@ import * as qrcode from 'qrcode-terminal';
 @Injectable()
 export class WhatsappService implements OnModuleInit {
   private client: any;
-  private readonly logger = new Logger('WhatsAppService'); // اسم أنيق في السجل
+  private readonly logger = new Logger('WhatsAppService');
 
   onModuleInit() {
     this.initializeClient();
@@ -16,7 +16,18 @@ export class WhatsappService implements OnModuleInit {
       authStrategy: new LocalAuth(),
       puppeteer: {
         headless: true,
-        args: ['--no-sandbox', '--disable-setuid-sandbox'],
+        // 🛠️ تعديلات جوهرية لحل مشكلة الانهيار في ويندوز
+        args: [
+          '--no-sandbox',
+          '--disable-setuid-sandbox',
+          '--disable-dev-shm-usage', // مهم جداً لويندوز
+          '--disable-accelerated-2d-canvas',
+          '--no-first-run',
+          '--no-zygote',
+          '--disable-gpu', // إيقاف المعالج الرسومي لتقليل الضغط
+        ],
+        // إذا استمر الخطأ، يمكنك إلغاء التعليق عن السطر التالي وتحديد مسار الكروم يدوياً:
+        // executablePath: 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe',
       },
     });
 
@@ -31,17 +42,24 @@ export class WhatsappService implements OnModuleInit {
 
     this.client.on('disconnected', (reason) => {
       this.logger.warn('⚠️ انقطع اتصال الواتساب: ' + reason);
-      this.client.initialize(); // إعادة الاتصال التلقائي
+      // تجنب إعادة التشغيل اللانهائي إذا كان السبب هو المتصفح
+      setTimeout(() => this.client.initialize(), 5000); 
     });
 
-    this.client.initialize();
+    // إضافة مستمع للأخطاء لمنع انهيار السيرفر بالكامل
+    this.client.on('auth_failure', msg => {
+        this.logger.error('❌ فشل المصادقة: ' + msg);
+    });
+
+    this.client.initialize().catch(err => {
+        this.logger.error('❌ فشل بدء تشغيل الواتساب: ' + err.message);
+    });
   }
 
   async sendMessage(phone: string, message: string) {
-    if (!phone) return; // حماية إضافية إذا كان الرقم فارغاً
+    if (!phone || !this.client) return;
 
     try {
-      // 1. تنظيف ومعالجة الرقم الجزائري
       let cleanPhone = phone.replace(/\D/g, '');
       if (cleanPhone.startsWith('0')) {
         cleanPhone = '213' + cleanPhone.substring(1);
@@ -49,20 +67,14 @@ export class WhatsappService implements OnModuleInit {
         cleanPhone = '213' + cleanPhone;
       }
 
-      // 2. التحقق من وجود الرقم في واتساب بصمت
       const numberDetails = await this.client.getNumberId(cleanPhone); 
 
       if (!numberDetails) {
-        // رسالة تحذيرية صفراء بدلاً من خطأ أحمر مزعج
-        this.logger.warn(`الرقم ${phone} غير مسجل في الواتساب. تم تجاوز الإرسال.`);
+        this.logger.warn(`الرقم ${phone} غير مسجل في الواتساب.`);
         return; 
       }
 
-      // 3. الإرسال الفعلي
-      const finalWhatsAppId = numberDetails._serialized;
-      await this.client.sendMessage(finalWhatsAppId, message);
-      
-      // رسالة نجاح خضراء وأنيقة
+      await this.client.sendMessage(numberDetails._serialized, message);
       this.logger.log(`📩 تم إرسال إشعار بنجاح إلى: ${phone}`);
       
     } catch (error) {

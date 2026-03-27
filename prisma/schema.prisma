@@ -38,6 +38,19 @@ model Customer {
   tickets   RepairTicket[] 
 }
 
+model RepairPart {
+  id            Int      @id @default(autoincrement())
+  name          String   // اسم القطعة (مثال: شاشة آيفون 11)
+  costPrice     Float    // سعر الشراء من المورد
+  invoiceNumber String?  // رقم الفاتورة (اختياري)
+  
+  // ✅ التصليح هنا: ربط القطعة بـ RepairTicket بدلاً من Repair
+  repairId      Int
+  repair        RepairTicket @relation(fields: [repairId], references: [id], onDelete: Cascade)
+
+  createdAt     DateTime @default(now())
+}
+
 model RepairTicket {
   id               Int            @id @default(autoincrement())
   customerId       String         @db.Uuid
@@ -52,10 +65,14 @@ model RepairTicket {
   status           RepairStatus   @default(PENDING)
   createdAt        DateTime       @default(now())
   updatedAt        DateTime       @updatedAt
-  price            Float        @default(0.0)
+  price            Float          @default(0.0)
+  
   customer         Customer       @relation(fields: [customerId], references: [id])
   technician       User?          @relation(fields: [technicianId], references: [id])
   usedParts        TicketPart[]   
+  
+  // ✅ التصليح هنا: إضافة العلاقة العكسية ليتعرف Prisma على القطع المشتراة
+  repairParts      RepairPart[]   
 }
 
 model SparePart {
